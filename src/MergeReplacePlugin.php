@@ -3,6 +3,7 @@
 namespace Radic\ComposerMergeReplacePlugin;
 
 use Composer\Composer;
+use Composer\Script\Event as ScriptEvent;
 use Composer\EventDispatcher\Event;
 use Composer\EventDispatcher\EventSubscriberInterface;
 use Composer\IO\IOInterface;
@@ -15,8 +16,6 @@ use Composer\Plugin\PluginInterface;
 use Composer\Script\ScriptEvents;
 use Composer\Semver\Constraint\MatchAllConstraint;
 use UnexpectedValueException;
-use Wikimedia\Composer\Merge\V2\MergePlugin;
-use Wikimedia\Composer\Merge\V2\MissingFileException;
 
 class MergeReplacePlugin implements PluginInterface, EventSubscriberInterface
 {
@@ -28,6 +27,28 @@ class MergeReplacePlugin implements PluginInterface, EventSubscriberInterface
     protected $logger;
 
     protected $vendorDir;
+
+    public static function getSubscribedEvents()
+    {
+        return [
+            ScriptEvents::PRE_AUTOLOAD_DUMP => [
+                [ 'addReplacePackages', 0 ],
+            ],
+            ScriptEvents::PRE_UPDATE_CMD    => [
+                [ 'addReplacePackages', 0 ],
+            ],
+            ScriptEvents::PRE_INSTALL_CMD    => [
+                [ 'addReplacePackages', 0 ],
+            ],
+        ];
+    }
+
+    public static function scriptEvent(ScriptEvent $event)
+    {
+        $plugin = new static();
+        $plugin->activate($event->getComposer(), $event->getIO());
+        $plugin->addReplacePackages();
+    }
 
     public function activate(Composer $composer, IOInterface $io)
     {
@@ -44,7 +65,8 @@ class MergeReplacePlugin implements PluginInterface, EventSubscriberInterface
     {
     }
 
-    public function excludePackageClassmaps()
+
+    public function addReplacePackages()
     {
         $this->vendorDir = $this->composer->getConfig()->get('vendor-dir');
         if ($plugin = $this->getWikimediaPlugin()) {
@@ -60,26 +82,11 @@ class MergeReplacePlugin implements PluginInterface, EventSubscriberInterface
                 foreach ($paths as $path) {
                     $json                        = $this->readPackageJson($path);
                     $replaces[ $json[ 'name' ] ] = $this->createLink($json[ 'name' ]);
+                    $this->logger->info("Adding [{$json[ 'name' ]}] to replace");
                 }
             }
             $this->mergeRootComposerReplaces($replaces);
         }
-    }
-
-    protected function createLink($packageName)
-    {
-        return new Link($this->composer->getPackage()->getName(), $packageName, new MatchAllConstraint(), Link::TYPE_REPLACE, '*');
-    }
-
-    protected function mergeRootComposerReplaces(array $replaces)
-    {
-        $result = array_replace_recursive($this->composer->getPackage()->getReplaces(), $replaces);
-        $this->composer->getPackage()->setReplaces($result);
-    }
-
-    protected function isValidPath($path)
-    {
-        return is_dir($path) || is_file($path);
     }
 
     /**
@@ -88,7 +95,7 @@ class MergeReplacePlugin implements PluginInterface, EventSubscriberInterface
     protected function getWikimediaPlugin()
     {
         foreach ($this->composer->getPluginManager()->getPlugins() as $plugin) {
-            if(get_class($plugin) === 'Wikimedia\\Composer\\Merge\\V2\\MergePlugin'){
+            if (get_class($plugin) === 'Wikimedia\\Composer\\Merge\\V2\\MergePlugin') {
                 return $plugin;
             }
         }
@@ -136,6 +143,22 @@ class MergeReplacePlugin implements PluginInterface, EventSubscriberInterface
         return $json;
     }
 
+    protected function createLink($packageName)
+    {
+        return new Link($this->composer->getPackage()->getName(), $packageName, new MatchAllConstraint(), Link::TYPE_REPLACE, '*');
+    }
+
+    protected function mergeRootComposerReplaces(array $replaces)
+    {
+        $result = array_replace_recursive($this->composer->getPackage()->getReplaces(), $replaces);
+        $this->composer->getPackage()->setReplaces($result);
+    }
+
+    protected function isValidPath($path)
+    {
+        return is_dir($path) || is_file($path);
+    }
+
     /**
      * @param array $json
      * @return CompletePackage
@@ -153,26 +176,6 @@ class MergeReplacePlugin implements PluginInterface, EventSubscriberInterface
         }
         // @codeCoverageIgnoreEnd
         return $package;
-    }
-
-    public function onCommand(CommandEvent $event)
-    {
-
-        $this->io->write('exclude-class-map onCommand');
-    }
-
-    public static function getSubscribedEvents()
-    {
-        return [
-            ScriptEvents::PRE_AUTOLOAD_DUMP => [
-                [ 'preAutoloadDump', 0 ],
-            ],
-        ];
-    }
-
-    public function preAutoloadDump(Event $event)
-    {
-        $this->excludePackageClassmaps();
     }
 
 }
