@@ -1,0 +1,28 @@
+{
+    "name": "radic/composer-merge-replace-plugin",
+    "description": "Adds all package names that 'wikimedia/composer-merge-plugin' merged to the root composer 'replace' object, this allows you to require those packages in any package and/or root composer.",
+    "keywords": ["classmap","exclude","autoload","override"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Robin Radic",
+            "email": "rradic@hotmail.com",
+            "homepage": "https://gitub.com/robinradic"
+        }
+    ],
+    "type": "composer-plugin",
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "require-dev": {
+        "composer/composer": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Radic\\ComposerMergeReplacePlugin\\": "src"
+        }
+    },
+    "extra": {
+        "class": "Radic\\ComposerMergeReplacePlugin\\MergeReplacePlugin"
+    }
+}
